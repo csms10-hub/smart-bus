@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<title>스마트 버스정류장</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b1220; --panel:#131c2e; --panel2:#1a2540; --line:#26324d;
+  --text:#e8edf7; --muted:#8a97b3; --accent:#3b82f6;
+  --amber:#ffb020; --amber-dim:#5a3d06;
+  --red:#ff3b3b; --yellow:#ffd21f; --green:#22e07a;
+  --ok:#22c55e; --bad:#ef4444;
+  --radius:18px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font-family:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  -webkit-tap-highlight-color:transparent}
+body{padding:0 16px 40px}
+.wrap{max-width:1100px;margin:0 auto}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 70%,transparent);
+  display:flex;align-items:center;gap:10px;padding:14px 0 12px}
+header h1{font-size:clamp(16px,4.6vw,20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin:0;font-weight:900;letter-spacing:-.5px;flex:1}
+header h1 span{color:var(--amber)}
+.pill{display:flex;flex:none;align-items:center;gap:6px;font-size:12px;padding:6px 10px;border-radius:99px;
+  background:var(--panel);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--bad)}
+.dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.iconbtn{background:var(--panel);border:1px solid var(--line);color:var(--text);width:38px;height:38px;
+  border-radius:12px;font-size:18px;cursor:pointer}
+
+/* ===== 버스 전광판 ===== */
+.board{background:#05070c;border:3px solid #2b2f3a;border-radius:var(--radius);padding:16px 16px 10px;
+  box-shadow:inset 0 0 40px rgba(0,0,0,.8),0 10px 30px rgba(0,0,0,.4);margin-bottom:16px;position:relative;overflow:hidden}
+.board::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background-image:radial-gradient(rgba(255,255,255,.04) 1px,transparent 1px);background-size:4px 4px}
+.board-top{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;
+  border-bottom:1px dashed #3a2a08;padding-bottom:10px;margin-bottom:6px}
+.city{color:var(--amber);font-size:14px;font-weight:700;opacity:.85}
+.station{color:#fff;font-size:clamp(22px,5.5vw,36px);font-weight:900;letter-spacing:-1px;line-height:1.15}
+.station small{font-size:13px;color:var(--muted);font-weight:500;margin-left:6px;letter-spacing:0}
+.clock{color:var(--amber);font-size:clamp(20px,4.5vw,30px);font-weight:700;font-variant-numeric:tabular-nums;
+  text-shadow:0 0 10px rgba(255,176,32,.6)}
+.busrow{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;
+  padding:12px 2px;border-bottom:1px solid #161a24}
+.busrow:last-child{border-bottom:none}
+.route{min-width:96px;text-align:center;font-size:clamp(26px,7vw,44px);font-weight:900;color:#fff;
+  background:#1d4ed8;border-radius:12px;padding:4px 12px;font-variant-numeric:tabular-nums;letter-spacing:-1px}
+.route.t-지선버스,.route.t-마을버스{background:#16a34a}
+.route.t-급행버스,.route.t-광역버스{background:#dc2626}
+.route.t-좌석버스{background:#0891b2}
+.businfo{color:var(--muted);font-size:14px;line-height:1.4}
+.businfo b{color:#cbd5e1;font-weight:500}
+.eta{font-size:clamp(28px,8vw,52px);font-weight:900;color:var(--amber);font-variant-numeric:tabular-nums;
+  text-shadow:0 0 14px rgba(255,176,32,.7);text-align:right;white-space:nowrap}
+.eta.soon{color:#ff5a3c;text-shadow:0 0 14px rgba(255,90,60,.8);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+.board-empty{color:var(--amber);font-size:20px;padding:26px 0;text-align:center;opacity:.9}
+.board-foot{display:flex;justify-content:space-between;color:#5b6478;font-size:12px;padding-top:8px}
+
+/* ===== 카드 ===== */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.card h2{margin:0 0 14px;font-size:17px;display:flex;align-items:center;gap:8px}
+.card h2 .tag{margin-left:auto;font-size:12px;font-weight:500;color:var(--muted)}
+.row{display:flex;align-items:center;gap:10px;margin:12px 0}
+.row label{flex:1;font-size:14px;color:#c7d0e3}
+.sub{font-size:12px;color:var(--muted)}
+
+/* 스위치 */
+.sw{position:relative;width:58px;height:32px;flex:none}
+.sw input{opacity:0;width:0;height:0}
+.sw span{position:absolute;inset:0;background:#334155;border-radius:99px;transition:.2s;cursor:pointer}
+.sw span::before{content:"";position:absolute;width:26px;height:26px;left:3px;top:3px;border-radius:50%;background:#fff;transition:.2s}
+.sw input:checked+span{background:var(--ok)}
+.sw input:checked+span::before{transform:translateX(26px)}
+
+/* 세그먼트 */
+.seg{display:flex;background:var(--panel2);border-radius:12px;padding:4px;gap:4px;flex:none}
+.seg button{border:0;background:transparent;color:var(--muted);padding:8px 14px;border-radius:9px;
+  font:inherit;font-size:14px;cursor:pointer}
+.seg button.on{background:var(--accent);color:#fff;font-weight:700}
+
+/* 신호등 */
+.tl-wrap{display:flex;gap:20px;align-items:center}
+.tl{background:#0a0e17;border:3px solid #2a3245;border-radius:28px;padding:12px;display:flex;flex-direction:column;gap:12px;flex:none}
+.lamp{width:66px;height:66px;border-radius:50%;background:#1c2232;transition:.15s;border:2px solid #000}
+.lamp.r.on{background:var(--red);box-shadow:0 0 28px var(--red),0 0 60px rgba(255,59,59,.5)}
+.lamp.y.on{background:var(--yellow);box-shadow:0 0 28px var(--yellow),0 0 60px rgba(255,210,31,.5)}
+.lamp.g.on{background:var(--green);box-shadow:0 0 28px var(--green),0 0 60px rgba(34,224,122,.5)}
+.tl-ctrl{flex:1;min-width:0}
+.cbtns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cbtns button{border:2px solid transparent;border-radius:12px;padding:12px 0;font:inherit;font-weight:700;cursor:pointer;color:#111}
+.cbtns .r{background:var(--red);color:#fff}.cbtns .y{background:var(--yellow)}.cbtns .g{background:var(--green)}
+.cbtns button.sel{border-color:#fff;box-shadow:0 0 0 2px var(--accent)}
+.cbtns button:disabled{opacity:.3}
+.secs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.secs div{background:var(--panel2);border-radius:12px;padding:8px;text-align:center}
+.secs input{width:100%;background:transparent;border:0;color:#fff;font:inherit;font-size:22px;font-weight:700;text-align:center}
+.secs span{font-size:12px;color:var(--muted)}
+
+/* 조도 */
+.big{font-size:44px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1}
+.meter{position:relative;height:16px;border-radius:99px;background:linear-gradient(90deg,#0f172a,#475569,#fde68a);margin:14px 0 6px}
+.meter .val{position:absolute;top:-5px;width:6px;height:26px;border-radius:4px;background:#fff;box-shadow:0 0 6px #fff;transform:translateX(-3px);transition:left .3s}
+.meter .th{position:absolute;top:-8px;bottom:-8px;width:0;border-left:2px dashed var(--amber)}
+.meter .th::after{content:"기준";white-space:nowrap;position:absolute;top:-16px;left:-12px;font-size:10px;color:var(--amber)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.neo-wrap{display:flex;align-items:center;gap:18px}
+.neo{width:78px;height:78px;border-radius:50%;background:#1c2232;border:3px solid #2a3245;flex:none;transition:.2s}
+input[type=color]{width:46px;height:36px;border:0;background:none;padding:0;cursor:pointer}
+
+/* 정류장 설정 */
+.field{display:flex;gap:8px;margin:8px 0}
+.field input{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:11px 12px;font:inherit;font-size:15px}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:0 16px;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0}
+.presets button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 6px;font:inherit;font-size:13px;cursor:pointer}
+.presets button.on{background:var(--accent);border-color:var(--accent);font-weight:700}
+.results{max-height:240px;overflow:auto;margin-top:6px}
+.result{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--line);font-size:14px}
+.result div{flex:1}
+.result .sub{display:block}
+
+/* 설정 창 */
+dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:var(--radius);
+  width:min(520px,calc(100vw - 32px));padding:20px}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog h3{margin:0 0 12px}
+dialog p{font-size:13px;color:var(--muted);line-height:1.6}
+dialog code{background:var(--panel2);padding:1px 5px;border-radius:5px;color:#fcd34d}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;border:1px solid var(--line);
+  padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.3s;pointer-events:none;z-index:20}
+.toast.show{opacity:1}
+.offline-note{background:#3b1d1d;border:1px solid #7f1d1d;color:#fecaca;border-radius:12px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
+.help{margin-top:16px;font-size:13px;color:var(--muted);line-height:1.7}
+.help summary{cursor:pointer;color:#c7d0e3;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>🚏 스마트 <span>버스정류장</span></h1>
+  <div class="pill"><i class="dot" id="dotFb"></i>서버</div>
+  <div class="pill"><i class="dot" id="dotEsp"></i>ESP32</div>
+  <button class="iconbtn" id="btnSettings" aria-label="설정">⚙️</button>
+</header>
+
+<div class="offline-note" id="offNote">ESP32가 응답하지 않아요. 전원과 핫스팟(2.4GHz) 연결을 확인하세요. 화면의 신호등·조도 값은 마지막으로 받은 값이에요.</div>
+
+<!-- ===== 버스 도착 전광판 ===== -->
+<section class="board" aria-live="polite">
+  <div class="board-top">
+    <div>
+      <div class="city" id="bCity">창원시</div>
+      <div class="station" id="bStation">정류장을 설정하세요</div>
+    </div>
+    <div class="clock" id="bClock">--:--:--</div>
+  </div>
+  <div id="busList"><div class="board-empty">버스 정보를 기다리는 중...</div></div>
+  <div class="board-foot"><span id="bSrc">-</span><span id="bUpd">-</span></div>
+</section>
+
+<div class="grid">
+  <!-- ===== 신호등 ===== -->
+  <section class="card">
+    <h2>🚦 신호등 <span class="tag" id="tlState">-</span></h2>
+    <div class="tl-wrap">
+      <div class="tl"><i class="lamp r" id="lR"></i><i class="lamp y" id="lY"></i><i class="lamp g" id="lG"></i></div>
+      <div class="tl-ctrl">
+        <div class="row" style="margin-top:0"><label>신호등 전원</label>
+          <label class="sw"><input type="checkbox" id="tOn"><span></span></label></div>
+        <div class="row"><label>모드</label>
+          <div class="seg" id="tMode"><button data-v="auto">자동</button><button data-v="manual">수동</button></div></div>
+        <div class="cbtns" id="tColor">
+          <button class="r" data-v="red">빨강</button><button class="y" data-v="yellow">노랑</button><button class="g" data-v="green">초록</button>
+        </div>
+      </div>
+    </div>
+    <p class="sub" style="margin:16px 0 8px">자동 모드 시간 (초)</p>
+    <div class="secs">
+      <div><input type="number" min="1" max="60" id="sR"><span>빨강</span></div>
+      <div><input type="number" min="1" max="60" id="sY"><span>노랑</span></div>
+      <div><input type="number" min="1" max="60" id="sG"><span>초록</span></div>
+    </div>
+  </section>
+
+  <!-- ===== 조도센서 ===== -->
+  <section class="card">
+    <h2>☀️ 조도센서 <span class="tag">0(어두움) ~ 4095(밝음)</span></h2>
+    <div class="row" style="margin-top:0;align-items:flex-end">
+      <div style="flex:1"><div class="sub">적용 중인 밝기 값</div><div class="big" id="luxVal">-</div></div>
+      <div style="text-align:right"><div class="sub">실제 센서 값</div><div style="font-size:22px;font-weight:700" id="sensVal">-</div></div>
+    </div>
+    <div class="meter"><i class="th" id="mTh"></i><i class="val" id="mVal"></i></div>
+    <div class="row"><label>조도 값 입력</label>
+      <div class="seg" id="luxMode"><button data-v="auto">자동(센서)</button><button data-v="manual">수동</button></div></div>
+    <div id="manualLuxBox">
+      <div class="row" style="margin-bottom:0"><label>수동 밝기 값</label><b id="mlTxt">-</b></div>
+      <input type="range" min="0" max="4095" step="5" id="manualLux">
+    </div>
+    <div class="row" style="margin-bottom:0"><label>네오픽셀 켜지는 기준 값 <span class="sub">(이 값보다 어두우면 ON)</span></label><b id="thTxt">-</b></div>
+    <input type="range" min="0" max="4095" step="5" id="threshold">
+  </section>
+
+  <!-- ===== 네오픽셀 ===== -->
+  <section class="card">
+    <h2>💡 네오픽셀 가로등 <span class="tag" id="neoState">-</span></h2>
+    <div class="neo-wrap">
+      <div class="neo" id="neoBall"></div>
+      <div style="flex:1">
+        <div class="row" style="margin-top:0"><label>제어 방식</label>
+          <div class="seg" id="neoMode"><button data-v="auto">자동(조도)</button><button data-v="manual">수동</button></div></div>
+        <div class="row"><label>수동 켜기/끄기</label>
+          <label class="sw"><input type="checkbox" id="neoOn"><span></span></label></div>
+      </div>
+    </div>
+    <div class="row"><label>색상</label><input type="color" id="neoColor" value="#ffffff"></div>
+    <div class="row" style="margin-bottom:0"><label>밝기</label><b id="nbTxt">-</b></div>
+    <input type="range" min="1" max="255" id="neoBright">
+  </section>
+
+  <!-- ===== 정류장 설정 ===== -->
+  <section class="card">
+    <h2>🗺️ 정류장 설정</h2>
+    <div class="sub">도시코드 (창원시 = 38010)</div>
+    <div class="field"><input id="cityCode" inputmode="numeric" placeholder="38010"></div>
+    <div class="sub">정류소 ID (nodeId)</div>
+    <div class="field"><input id="nodeId" placeholder="예: CWB379000000"><button class="btn" id="btnSaveStop">저장</button></div>
+    <div class="sub" style="margin-top:14px">창신중학교 근처 정류장 (누르면 바로 선택)</div>
+    <div class="presets" id="presets">
+      <button data-id="CWB379000926">봉암동 ①</button><button data-id="CWB379000933">봉암동 ②</button>
+      <button data-id="CWB379000907">봉덕초등학교 ①</button><button data-id="CWB379000906">봉덕초등학교 ②</button>
+      <button data-id="CWB379000912">자유무역지역후문 ①</button><button data-id="CWB379000918">자유무역지역후문 ②</button>
+    </div>
+    <div class="sub" style="margin-top:14px">정류장 이름으로 찾기</div>
+    <div class="field"><input id="searchName" placeholder="예: 창원시청, 상남시장"><button class="btn ghost" id="btnSearch">검색</button></div>
+    <div class="sub" id="searchMsg"></div>
+    <div class="results" id="results"></div>
+  </section>
+</div>
+
+<details class="help">
+  <summary>📘 연결 방법 도움말</summary>
+  <ol>
+    <li>ESP32는 <b>2.4GHz 와이파이만</b> 접속돼요. 학교 5G 와이파이에는 못 붙어요. 휴대폰 핫스팟을 2.4GHz로 켜고 ESP32를 연결하세요. (아이폰: 개인용 핫스팟 → <b>호환성 최대화</b> 켜기 / 안드로이드: 모바일 핫스팟 → 대역 <b>2.4GHz</b>)</li>
+    <li>ESP32와 이 웹앱은 <b>Firebase</b>를 통해 만나요. 그래서 이 웹앱은 학교 5G 와이파이, LTE, 집 어디서든 원격으로 제어돼요.</li>
+    <li>오른쪽 위 ⚙️ 에 Firebase Realtime Database 주소를 넣으세요. 아두이노 코드의 <code>FIREBASE_URL</code>과 같아야 해요.</li>
+    <li>정류장 이름으로 검색하면 ESP32가 공공데이터에서 찾아 결과를 보여줘요. 원하는 정류장의 <b>선택</b>을 누르세요.</li>
+  </ol>
+</details>
+</div>
+
+<dialog id="dlg">
+  <h3>⚙️ 연결 설정</h3>
+  <p>Firebase 콘솔 → Realtime Database 상단에 보이는 주소를 붙여넣으세요.<br>예) <code>https://my-busstop-default-rtdb.asia-southeast1.firebasedatabase.app</code></p>
+  <div class="sub">Database URL</div>
+  <div class="field"><input id="cfgUrl" placeholder="https://...firebasedatabase.app"></div>
+  <div class="sub">인증 키 (테스트 모드라면 비워두기)</div>
+  <div class="field"><input id="cfgAuth" placeholder="(선택) 데이터베이스 비밀번호"></div>
+  <p>규칙(Rules)이 <code>".read": true, ".write": true</code> 이어야 해요. 수업이 끝나면 규칙을 다시 잠그세요.</p>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn ghost" id="cfgCancel" style="padding:10px 16px">닫기</button>
+    <button class="btn" id="cfgSave" style="padding:10px 16px">저장하고 연결</button>
+  </div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== 기본 설정 ==================
+   DEFAULT_FB_URL 에 주소를 미리 적어두면 학생들이 설정을 안 해도 바로 연결돼요. */
+const DEFAULT_FB_URL  = "https://traffice-9d12f-default-rtdb.firebaseio.com";
+const DEFAULT_FB_AUTH = "";
+const SERVICE_KEY = "5c78a5008282a4ef26f1d535b705db375ab82eedb1dbcae02262c78fbbe7d492";
+const ROOT = "/smartbus";
+const DEFAULT_CONTROL = {
+  trafficOn:true, trafficMode:"auto", manualColor:"red", redSec:5, yellowSec:2, greenSec:5,
+  luxMode:"auto", manualLux:2000, threshold:1500,
+  neoMode:"auto", neoManualOn:false, neoColor:"#FFFFFF", neoBright:150,
+  cityCode:"38010", nodeId:"CWB379000926", searchName:"", searchId:0
+};
+
+const $ = id => document.getElementById(id);
+function store(k,v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k,v);}catch(e){ return null; } }
+let cfg = { url: store("sb_url") || DEFAULT_FB_URL, auth: store("sb_auth") || DEFAULT_FB_AUTH };
+
+let tree = {};            // Firebase /smartbus 전체 사본
+let es = null, fbOk = false;
+let statusAt = 0;         // 마지막으로 ESP32 상태를 받은 시각(내 휴대폰 기준)
+let busAt = 0;            // 버스 정보를 받은 시각
+let directBus = null, directAt = 0, directTried = 0, directFailed = false;
+let initDone = false;
+
+function fbUrl(path){
+  let u = cfg.url.replace(/\/+$/,"") + ROOT + path + ".json";
+  if(cfg.auth) u += "?auth=" + encodeURIComponent(cfg.auth);
+  return u;
+}
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),1800); }
+
+/* ================== Firebase 실시간 연결 (REST 스트리밍) ================== */
+function connect(){
+  if(es){ es.close(); es=null; }
+  tree = {}; initDone=false; setFb(false);
+  if(!cfg.url){ openSettings(); return; }
+  try{ es = new EventSource(fbUrl("")); }catch(e){ toast("주소를 확인하세요"); return; }
+  es.addEventListener("put", e => { const m=JSON.parse(e.data); apply(m.path, m.data, false); });
+  es.addEventListener("patch", e => { const m=JSON.parse(e.data);
+    for(const k in m.data) apply((m.path==="/"?"":m.path)+"/"+k, m.data[k], true); render(); });
+  es.addEventListener("cancel", () => { setFb(false); toast("권한 거부: Firebase 규칙을 확인하세요"); });
+  es.addEventListener("auth_revoked", () => setFb(false));
+  es.onopen = () => setFb(true);
+  es.onerror = () => setFb(false);
+}
+function setFb(ok){ fbOk=ok; $("dotFb").classList.toggle("on", ok); }
+
+function apply(path, data, fromPatch){
+  setFb(true);
+  const parts = path.split("/").filter(Boolean);
+  if(parts.length===0){
+    tree = data || {};
+    if(tree.status && tree.status.lastSeen) statusAt = Math.min(Date.now(), tree.status.lastSeen);
+    if(tree.bus && tree.bus.updated) busAt = Math.min(Date.now(), tree.bus.updated);
+    if(!initDone){ initDone=true; ensureControl(); }
+  }else{
+    let o = tree;
+    for(let i=0;i<parts.length-1;i++){ if(typeof o[parts[i]]!=="object"||o[parts[i]]===null) o[parts[i]]={}; o=o[parts[i]]; }
+    const last = parts[parts.length-1];
+    if(data===null) delete o[last]; else o[last]=data;
+    if(parts[0]==="status") statusAt = Date.now();
+    if(parts[0]==="bus") busAt = Date.now();
+  }
+  if(!fromPatch) render();
+}
+
+async function patchControl(obj){
+  tree.control = Object.assign({}, tree.control||{}, obj);   // 화면 먼저 반영
+  render();
+  if(!cfg.url){ openSettings(); return; }
+  try{
+    const r = await fetch(fbUrl("/control"), {method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify(obj)});
+    if(!r.ok) throw new Error(r.status);
+  }catch(e){ toast("전송 실패 ("+e.message+")"); }
+}
+function ensureControl(){
+  const c = tree.control || {};
+  const miss = {};
+  for(const k in DEFAULT_CONTROL) if(c[k]===undefined) miss[k]=DEFAULT_CONTROL[k];
+  if(!c.nodeId) miss.nodeId = DEFAULT_CONTROL.nodeId;   // 비어 있으면 봉암동으로
+  if(Object.keys(miss).length) patchControl(miss);
+}
+const C = k => (tree.control && tree.control[k]!==undefined) ? tree.control[k] : DEFAULT_CONTROL[k];
+
+/* ================== 화면 그리기 ================== */
+function setVal(el, v){ if(document.activeElement!==el) el.value = v; }
+function segSet(id, v){ $(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.v===v)); }
+function espOnline(){ return statusAt && (Date.now()-statusAt) < 12000; }
+
+function render(){
+  const s = tree.status || {};
+  const online = espOnline();
+  $("dotEsp").classList.toggle("on", online);
+  $("offNote").style.display = (fbOk && !online) ? "block" : "none";
+
+  // 신호등
+  const light = s.light || "off";
+  $("lR").classList.toggle("on", light==="red");
+  $("lY").classList.toggle("on", light==="yellow");
+  $("lG").classList.toggle("on", light==="green");
+  const on = C("trafficOn"), mode = C("trafficMode");
+  $("tOn").checked = on;
+  segSet("tMode", mode);
+  $("tlState").textContent = !on ? "꺼짐" : (mode==="auto" ? "자동 순환 중" : "수동");
+  $("tColor").querySelectorAll("button").forEach(b=>{
+    b.classList.toggle("sel", mode==="manual" && b.dataset.v===C("manualColor"));
+    b.disabled = !on;
+  });
+  setVal($("sR"), C("redSec")); setVal($("sY"), C("yellowSec")); setVal($("sG"), C("greenSec"));
+
+  // 조도
+  const lux = s.lux ?? null, sens = s.sensor ?? null, th = C("threshold");
+  $("luxVal").textContent = lux===null ? "-" : lux;
+  $("sensVal").textContent = sens===null ? "-" : sens;
+  $("mVal").style.left = ((lux||0)/4095*100)+"%";
+  $("mTh").style.left = (th/4095*100)+"%";
+  segSet("luxMode", C("luxMode"));
+  $("manualLuxBox").style.opacity = C("luxMode")==="manual" ? 1 : .4;
+  $("manualLux").disabled = C("luxMode")!=="manual";
+  setVal($("manualLux"), C("manualLux")); if(document.activeElement!==$("manualLux")) $("mlTxt").textContent = C("manualLux");
+  setVal($("threshold"), th); if(document.activeElement!==$("threshold")) $("thTxt").textContent = th;
+
+  // 네오픽셀
+  const neo = !!s.neo, col = C("neoColor"), br = C("neoBright");
+  segSet("neoMode", C("neoMode"));
+  $("neoOn").checked = C("neoMode")==="manual" ? C("neoManualOn") : neo;
+  $("neoOn").disabled = C("neoMode")!=="manual";
+  $("neoOn").parentElement.style.opacity = C("neoMode")==="manual" ? 1 : .45;
+  setVal($("neoColor"), String(col).toLowerCase());
+  setVal($("neoBright"), br); if(document.activeElement!==$("neoBright")) $("nbTxt").textContent = br;
+  const ball = $("neoBall");
+  if(neo){ ball.style.background = col; ball.style.boxShadow = `0 0 ${10+br/6}px ${col}, 0 0 ${20+br/3}px ${col}`; ball.style.opacity = .55 + br/255*.45; }
+  else { ball.style.background = "#1c2232"; ball.style.boxShadow="none"; ball.style.opacity=1; }
+  $("neoState").textContent = (neo ? "켜짐" : "꺼짐") + (C("neoMode")==="auto" ? " · 자동" : " · 수동");
+
+  // 정류장 설정
+  setVal($("cityCode"), C("cityCode")); setVal($("nodeId"), C("nodeId"));
+  $("presets").querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.id===C("nodeId")));
+  renderSearch();
+  renderBus();
+}
+
+function renderSearch(){
+  const sr = tree.search;
+  const box = $("results");
+  if(!sr || sr.id !== pendingSearch.id){ return; }
+  $("searchMsg").textContent = sr.msg || `'${sr.name}' 검색 결과 ${(sr.results||[]).length}개`;
+  box.innerHTML = "";
+  (sr.results||[]).forEach(r=>{
+    const d = document.createElement("div"); d.className="result";
+    d.innerHTML = `<div><b></b><span class="sub"></span></div><button class="btn" style="padding:8px 14px">선택</button>`;
+    d.querySelector("b").textContent = r.nodenm;
+    d.querySelector(".sub").textContent = `ID ${r.nodeid}` + (r.nodeno ? ` · 번호 ${r.nodeno}` : "");
+    d.querySelector("button").onclick = () => { patchControl({nodeId:r.nodeid}); toast(r.nodenm+" 선택!"); directBus=null; };
+    box.appendChild(d);
+  });
+}
+
+function busData(){
+  const b = tree.bus;
+  const fromEsp = b && b.nodeId === C("nodeId") && busAt && (Date.now()-busAt < 120000);
+  if(fromEsp) return {src:"ESP32 · 공공데이터", at:busAt, ...b};
+  if(directBus) return {src:"웹앱 직접 조회 · 공공데이터", at:directAt, ...directBus};
+  if(b) return {src:"ESP32 (오래된 정보)", at:busAt, ...b};
+  return null;
+}
+
+function renderBus(){
+  const d = busData();
+  const city = (d && d.cityName) || (C("cityCode")==="38010" ? "창원시" : "도시코드 "+C("cityCode"));
+  $("bCity").textContent = city;
+  $("bStation").innerHTML = "";
+  const nm = document.createTextNode((d && d.nodeName) || (C("nodeId") ? "정류장 "+C("nodeId") : "정류장을 설정하세요"));
+  $("bStation").appendChild(nm);
+  if(C("nodeId")){ const sm=document.createElement("small"); sm.textContent=C("nodeId"); $("bStation").appendChild(sm); }
+
+  const list = $("busList");
+  if(!C("nodeId")){ list.innerHTML = `<div class="board-empty">아래 '정류장 설정'에서 정류장을 골라주세요</div>`; $("bSrc").textContent="-"; $("bUpd").textContent="-"; return; }
+  if(!d){ list.innerHTML = `<div class="board-empty">버스 정보를 기다리는 중...</div>`; return; }
+  const el = Math.max(0, (Date.now()-d.at)/1000);
+  const rows = (d.list||[]).map(x=>({...x, left: Math.max(0, Math.round((+x.arrtime||0)-el))})).sort((a,b)=>a.left-b.left);
+  if(!rows.length){ list.innerHTML = `<div class="board-empty"></div>`; list.firstChild.textContent = d.msg || "도착 예정 버스가 없어요"; }
+  else{
+    list.innerHTML = "";
+    rows.forEach(x=>{
+      const soon = x.left < 60 || +x.prevcnt <= 1;
+      const r = document.createElement("div"); r.className="busrow";
+      r.innerHTML = `<div class="route"></div><div class="businfo"><b></b><br><span></span></div><div class="eta"></div>`;
+      const rt = r.querySelector(".route"); rt.textContent = x.routeno; rt.classList.add("t-"+(x.routetp||"").replace(/\s/g,""));
+      r.querySelector("b").textContent = x.routetp || "버스";
+      r.querySelector("span").textContent = `${x.prevcnt}정거장 전`;
+      const eta = r.querySelector(".eta");
+      if(x.left < 60){ eta.textContent = "곧 도착"; eta.classList.add("soon"); }
+      else { const m=Math.floor(x.left/60), s=x.left%60; eta.textContent = m + "분 " + String(s).padStart(2,"0")+"초"; }
+      if(soon && x.left>=60) eta.style.color="#ff8a3c";
+      list.appendChild(r);
+    });
+  }
+  $("bSrc").textContent = d.src;
+  $("bUpd").textContent = "갱신 " + Math.round(el) + "초 전";
+}
+
+/* 웹앱에서 공공데이터 직접 조회 (ESP32가 꺼져 있을 때 보조용. 브라우저가 막으면 실패할 수 있음) */
+async function directFetch(){
+  const node = C("nodeId"); if(!node) return;
+  directTried = Date.now();
+  const url = `https://apis.data.go.kr/1613000/ArvlInfoInqireService/getSttnAcctoArvlPrearngeInfoList?serviceKey=${SERVICE_KEY}&cityCode=${C("cityCode")}&nodeId=${encodeURIComponent(node)}&numOfRows=30&pageNo=1&_type=json`;
+  try{
+    const j = await (await fetch(url)).json();
+    let it = j?.response?.body?.items?.item || [];
+    if(!Array.isArray(it)) it=[it];
+    directBus = { nodeId:node, nodeName: it[0]?.nodenm || "", cityName:"",
+      list: it.map(v=>({routeno:String(v.routeno), routetp:v.routetp, arrtime:+v.arrtime, prevcnt:+v.arrprevstationcnt})),
+      msg: it.length ? "" : "도착 예정 버스가 없어요" };
+    directAt = Date.now(); directFailed=false;
+  }catch(e){ directFailed = true; }
+}
+
+/* ================== 조작 이벤트 ================== */
+$("tOn").onchange = e => patchControl({trafficOn:e.target.checked});
+$("tMode").onclick = e => { const v=e.target.dataset.v; if(v) patchControl({trafficMode:v}); };
+$("tColor").onclick = e => { const v=e.target.dataset.v; if(v) patchControl({trafficMode:"manual", manualColor:v}); };
+[["sR","redSec"],["sY","yellowSec"],["sG","greenSec"]].forEach(([id,k])=>{
+  $(id).onchange = e => { const n=Math.min(60,Math.max(1,parseInt(e.target.value)||1)); e.target.value=n; patchControl({[k]:n}); };
+});
+$("luxMode").onclick = e => { const v=e.target.dataset.v; if(v) patchControl({luxMode:v}); };
+$("manualLux").oninput = e => $("mlTxt").textContent = e.target.value;
+$("manualLux").onchange = e => { patchControl({manualLux:+e.target.value}); e.target.blur(); };
+$("threshold").oninput = e => { $("thTxt").textContent = e.target.value; $("mTh").style.left=(e.target.value/4095*100)+"%"; };
+$("threshold").onchange = e => { patchControl({threshold:+e.target.value}); e.target.blur(); };
+$("neoMode").onclick = e => { const v=e.target.dataset.v; if(v) patchControl({neoMode:v}); };
+$("neoOn").onchange = e => patchControl({neoMode:"manual", neoManualOn:e.target.checked});
+$("neoColor").onchange = e => { patchControl({neoColor:e.target.value.toUpperCase()}); e.target.blur(); };
+$("neoBright").oninput = e => $("nbTxt").textContent = e.target.value;
+$("neoBright").onchange = e => { patchControl({neoBright:+e.target.value}); e.target.blur(); };
+$("btnSaveStop").onclick = () => {
+  const c = $("cityCode").value.trim() || "38010", n = $("nodeId").value.trim();
+  patchControl({cityCode:c, nodeId:n}); directBus=null; toast("정류장 저장!"); $("nodeId").blur();
+};
+$("presets").onclick = e => { const id=e.target.dataset.id; if(!id) return;
+  patchControl({cityCode:"38010", nodeId:id}); directBus=null; toast(e.target.textContent.trim()+" 선택!"); };
+let pendingSearch = {id:0};
+function doSearch(){
+  const name = $("searchName").value.trim(); if(!name) return;
+  pendingSearch = {id:Date.now(), name};
+  $("results").innerHTML = ""; $("searchMsg").textContent = "ESP32가 검색 중이에요...";
+  patchControl({cityCode:$("cityCode").value.trim()||C("cityCode"), searchName:name, searchId:pendingSearch.id});
+  setTimeout(()=>{ if(!tree.search || tree.search.id!==pendingSearch.id)
+    $("searchMsg").textContent = espOnline() ? "응답이 늦어요. 조금만 기다려 주세요." : "ESP32가 꺼져 있어서 검색할 수 없어요."; }, 8000);
+}
+$("btnSearch").onclick = doSearch;
+$("searchName").onkeydown = e => { if(e.key==="Enter") doSearch(); };
+
+/* 설정 창 */
+function openSettings(){ $("cfgUrl").value=cfg.url; $("cfgAuth").value=cfg.auth; if(!$("dlg").open) $("dlg").showModal(); }
+$("btnSettings").onclick = openSettings;
+$("cfgCancel").onclick = () => $("dlg").close();
+$("cfgSave").onclick = () => {
+  let u = $("cfgUrl").value.trim().replace(/\/+$/,"").replace(/\.json$/,"");
+  if(u && !/^https:\/\//.test(u)) u = "https://"+u;
+  cfg = {url:u, auth:$("cfgAuth").value.trim()};
+  store("sb_url", cfg.url); store("sb_auth", cfg.auth);
+  $("dlg").close(); connect(); toast("연결 중...");
+};
+
+/* 시계 + 1초마다 화면 갱신 */
+setInterval(()=>{
+  const n=new Date(); $("bClock").textContent = [n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>String(v).padStart(2,"0")).join(":");
+  renderBus();
+  const online = espOnline();
+  $("dotEsp").classList.toggle("on", online);
+  $("offNote").style.display = (fbOk && !online) ? "block" : "none";
+  // ESP32가 꺼져 있으면 30초마다 웹에서 직접 조회 시도
+  if(!online && C("nodeId") && Date.now()-directTried > 30000) directFetch();
+},1000);
+
+render();
+connect();
+</script>
+</body>
+</html>
