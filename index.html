@@ -25,11 +25,13 @@ body{padding:0 16px 40px}
 .wrap{max-width:1100px;margin:0 auto}
 header{position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 70%,transparent);
   display:flex;align-items:center;gap:10px;padding:14px 0 12px}
+header{flex-wrap:wrap}
 header h1{font-size:clamp(16px,4.6vw,20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin:0;font-weight:900;letter-spacing:-.5px;flex:1}
 header h1 span{color:var(--amber)}
 .pill{display:flex;flex:none;align-items:center;gap:6px;font-size:12px;padding:6px 10px;border-radius:99px;
   background:var(--panel);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--bad)}
+.dot.wait{background:#f59e0b}
 .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
 .iconbtn{background:var(--panel);border:1px solid var(--line);color:var(--text);width:38px;height:38px;
   border-radius:12px;font-size:18px;cursor:pointer}
@@ -142,17 +144,19 @@ dialog code{background:var(--panel2);padding:1px 5px;border-radius:5px;color:#fc
 .offline-note{background:#3b1d1d;border:1px solid #7f1d1d;color:#fecaca;border-radius:12px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none}
 .help{margin-top:16px;font-size:13px;color:var(--muted);line-height:1.7}
 .help summary{cursor:pointer;color:#c7d0e3;font-weight:700}
+@media(max-width:520px){header h1{flex:1 1 calc(100% - 50px)} header .pill{flex:1 1 0;justify-content:center}}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
   <h1>🚏 스마트 <span>버스정류장</span></h1>
-  <div class="pill"><i class="dot" id="dotFb"></i>서버</div>
-  <div class="pill"><i class="dot" id="dotEsp"></i>ESP32</div>
+  <div class="pill"><i class="dot" id="dotFb"></i><span id="txtFb">서버 확인중</span></div>
+  <div class="pill"><i class="dot" id="dotEsp"></i><span id="txtEsp">보드 확인중</span></div>
   <button class="iconbtn" id="btnSettings" aria-label="설정">⚙️</button>
 </header>
 
+<div class="offline-note" id="fbNote"></div>
 <div class="offline-note" id="offNote">ESP32가 응답하지 않아요. 전원과 핫스팟(2.4GHz) 연결을 확인하세요. 화면의 신호등·조도 값은 마지막으로 받은 값이에요.</div>
 
 <!-- ===== 버스 도착 전광판 ===== -->
@@ -314,12 +318,39 @@ function connect(){
   es.addEventListener("put", e => { const m=JSON.parse(e.data); apply(m.path, m.data, false); });
   es.addEventListener("patch", e => { const m=JSON.parse(e.data);
     for(const k in m.data) apply((m.path==="/"?"":m.path)+"/"+k, m.data[k], true); render(); });
-  es.addEventListener("cancel", () => { setFb(false); toast("권한 거부: Firebase 규칙을 확인하세요"); });
+  es.addEventListener("cancel", () => { setFb(false); diagnose(); });
   es.addEventListener("auth_revoked", () => setFb(false));
   es.onopen = () => setFb(true);
-  es.onerror = () => setFb(false);
+  es.onerror = () => { setFb(false); diagnose(); };
 }
-function setFb(ok){ fbOk=ok; $("dotFb").classList.toggle("on", ok); }
+let fbReason = "";
+function setFb(ok){
+  fbOk = ok; if(ok) fbReason = "";
+  $("dotFb").classList.toggle("on", ok);
+  $("txtFb").textContent = ok ? "서버 연결됨" : (fbReason==="denied" ? "서버 권한거부" : fbReason==="offline" ? "인터넷 없음" : "서버 끊김");
+  const n = $("fbNote");
+  if(ok){ n.style.display="none"; return; }
+  if(fbReason==="denied"){
+    n.innerHTML = "<b>Firebase가 접속을 막고 있어요 (Permission denied).</b><br>Firebase 콘솔 → Realtime Database → <b>규칙</b> 탭에서 <code>\".read\": true, \".write\": true</code> 로 바꾸고 <b>게시</b>를 누르세요. 바꾸면 자동으로 다시 연결돼요.";
+    n.style.display="block";
+  } else if(fbReason==="offline"){
+    n.innerHTML = "인터넷에 연결되어 있지 않아요. 와이파이나 데이터를 확인하세요."; n.style.display="block";
+  } else if(fbReason==="notfound"){
+    n.innerHTML = "Firebase 주소를 찾을 수 없어요. ⚙️ 설정의 주소를 확인하세요."; n.style.display="block";
+  }
+}
+let diagBusy = false;
+async function diagnose(){
+  if(diagBusy || !cfg.url) return; diagBusy = true;
+  try{
+    const r = await fetch(fbUrl("/control") + (cfg.auth ? "&" : "?") + "shallow=true", {cache:"no-store"});
+    fbReason = (r.status===401||r.status===403) ? "denied" : (r.status===404 ? "notfound" : (r.ok ? "" : "error"));
+  }catch(e){ fbReason = "offline"; }
+  diagBusy = false;
+  setFb(fbOk);
+  // 권한 문제로 스트림이 닫혔으면 10초 뒤 다시 연결
+  if(es && es.readyState === 2){ clearTimeout(window._rc); window._rc = setTimeout(connect, 10000); }
+}
 
 function apply(path, data, fromPatch){
   setFb(true);
@@ -359,6 +390,18 @@ function ensureControl(){
 const C = k => (tree.control && tree.control[k]!==undefined) ? tree.control[k] : DEFAULT_CONTROL[k];
 
 /* ================== 화면 그리기 ================== */
+function updEsp(online){
+  $("dotEsp").classList.toggle("on", online);
+  let t = "보드 확인중";
+  if(online) t = "보드 연결됨";
+  else if(fbOk) t = statusAt ? "보드 응답없음" : "보드 기록없음";
+  else t = "보드 확인불가";
+  $("txtEsp").textContent = t;
+  $("offNote").style.display = (fbOk && !online) ? "block" : "none";
+  if(fbOk && !online) $("offNote").innerHTML = statusAt
+    ? "ESP32가 " + Math.round((Date.now()-statusAt)/1000) + "초 전부터 응답이 없어요. 전원과 핫스팟(2.4GHz) 연결을 확인하세요."
+    : "서버는 연결됐지만 ESP32가 아직 한 번도 접속하지 않았어요. 아두이노 코드의 와이파이 이름/비밀번호, 핫스팟이 2.4GHz인지 확인하고 시리얼 모니터(115200)를 보세요.";
+}
 function setVal(el, v){ if(document.activeElement!==el) el.value = v; }
 function segSet(id, v){ $(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.v===v)); }
 function espOnline(){ return statusAt && (Date.now()-statusAt) < 12000; }
@@ -366,8 +409,7 @@ function espOnline(){ return statusAt && (Date.now()-statusAt) < 12000; }
 function render(){
   const s = tree.status || {};
   const online = espOnline();
-  $("dotEsp").classList.toggle("on", online);
-  $("offNote").style.display = (fbOk && !online) ? "block" : "none";
+  updEsp(online);
 
   // 신호등
   const light = s.light || "off";
@@ -544,8 +586,7 @@ setInterval(()=>{
   const n=new Date(); $("bClock").textContent = [n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>String(v).padStart(2,"0")).join(":");
   renderBus();
   const online = espOnline();
-  $("dotEsp").classList.toggle("on", online);
-  $("offNote").style.display = (fbOk && !online) ? "block" : "none";
+  updEsp(online);
   // ESP32가 꺼져 있으면 30초마다 웹에서 직접 조회 시도
   if(!online && C("nodeId") && Date.now()-directTried > 30000) directFetch();
 },1000);
